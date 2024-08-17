@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SimpleFOC.h>
-
+#include <USBSerial.h>
 /*
 ESC_BLDC_2024
 By Noturno and Bail
@@ -15,8 +15,6 @@ FASE B - VERDE
 FASE C - AMARELO
  
  */
-
-#include <SimpleFOC.h>
 
 int i=0;
 // BLDC motor & driver instance
@@ -44,23 +42,20 @@ PIDController& pid_q = motor.PID_current_q;
 
 
 //  LowsideCurrentSense(shunt_resistance, gain, adc_a, adc_b, adc_c)
-  LowsideCurrentSense current_sense = LowsideCurrentSense(0.02, 10, PA7, PB0, PB1);
+LowsideCurrentSense current_sense = LowsideCurrentSense(0.02, 10, PA7, PB0, PB1);
 // low side current sensors (for all phases) instantiated 
 
 // instantiate the commander- For this code, we aren't controll via serial, so this part are commented
-  Commander command = Commander(Serial);
+Commander command = Commander(Serial);
   void doTarget(char* cmd) { command.scalar(&target_velocity, cmd); }
   void doMotor(char* cmd) { command.motor(&motor, cmd); }
   void onPid(char* cmd){ command.pid(&pid_d,cmd); command.pid(&pid_q,cmd);}
 // To control velocity of the motor via Serial Monitor/Plotter
 
-
-
-
 void setup() { 
   delay(3000); // delay para possibilitar a verificação do inicio das configs via serial plott
   
-// use monitoring with serial 
+// use monitoring with serial
   Serial.begin(115200);
 
 // enable more verbose output from library for debugging
@@ -225,7 +220,6 @@ void setup() {
 
 
 void loop() {
-
   motor.loopFOC();
 
  
