@@ -6,6 +6,10 @@
 		{
 			"name": "SimpleFOC",
 			"path": "."
+		},
+		{
+			"name": "weact-ver",
+			"path": "../weact-ver"
 		}
 	],
 	"settings": {
