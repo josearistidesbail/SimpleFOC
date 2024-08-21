@@ -6,7 +6,21 @@
 		{
 			"name": "SimpleFOC",
 			"path": "."
+		},
+		{
+			"name": "weact-ver",
+			"path": "../weact-ver"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"deque": "cpp",
+			"string": "cpp",
+			"unordered_map": "cpp",
+			"vector": "cpp",
+			"string_view": "cpp",
+			"initializer_list": "cpp"
+		}
+	}
 }
