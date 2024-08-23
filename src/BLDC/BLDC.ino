@@ -233,7 +233,7 @@ void loop()
     float error = motor.target - motor.current.q;
     motor.zero_electric_angle = offset_angle;
 
-    Coast();
+    PulseAndGlide();
 
     cycle = 0;
     DBG(motor.target); // milli Amps
@@ -262,7 +262,7 @@ void CalculateButtonThrottle()
 }
 
 // Implements pulse and glide strategy - Car should accelerate to defined  TURNOFF_SPEED and then coast until TURNON_SPEED is reached
-void Coast()
+void PulseAndGlide()
 {
 if (MAX_VEL_TRIGGERED)
     {
