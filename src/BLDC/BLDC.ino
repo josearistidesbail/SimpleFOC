@@ -1,7 +1,7 @@
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
 #include <encoders/smoothing/SmoothingSensor.h>
-
+#include <BLDCCustomMotor.h>
 /*
 ESC_BLDC_2024
 By Noturno and Bail
@@ -35,12 +35,19 @@ const int TURNON_SPEED = 13;  // rad/s
 const int SPEED_CYCLES = 250;
 const float ACCEL_RAMP = 0.001;
 
+const int POLE_PAIRS = 88;  
+const float PHASE_RESISTANCE = 0.098;
+const float PHASE_INDUCTANCE = 0.0000644;
+const float PM_FLUX_LINKAGE = 0.001;
+
 bool MAX_VEL_TRIGGERED = false;
 float target_torque = 0;
 float offset_angle = 3.14f;
+float time_constant = 0;
 // BLDC motor & driver instance
 // BLDC motor instance BLDCMotor(polepairs, (R), (KV))
-BLDCMotor motor = BLDCMotor(88, 0.098, MOTOR_KV);
+BLDCMotor motor = BLDCMotor(88, 0.098, MOTOR_KV, PHASE_INDUCTANCE);
+//BLDCCustomMotor motor = BLDCCustomMotor(POLE_PAIRS, PHASE_RESISTANCE, MOTOR_KV, PM_FLUX_LINKAGE);
 // PWM pins
 BLDCDriver6PWM driver = BLDCDriver6PWM(PA8, PB13, PA9, PB14, PA10, PB15);
 
@@ -66,12 +73,14 @@ int cycle = 0;
 // LowsideCurrentSense(shunt_resistance, gain, adc_a, adc_b, adc_c)
 LowsideCurrentSense current_sense = LowsideCurrentSense(0.002, 40, PA7, PB0, PB1);
 // low side current sensors (for all phases) instantiated
-
+// LowPassFilter d_lpf = LowPassFilter(time_constant);
+// LowPassFilter q_lpf = LowPassFilter(time_constant);
 // instantiate the commander for managing via Serial
 // TODO: Check performance impact
 Commander command = Commander(Serial);
 void doTarget(char *cmd) { command.scalar(&target_torque, cmd); }
 void doOffset(char *cmd) { command.scalar(&offset_angle, cmd); }
+void onLpf(char* cmd){ command.scalar(&time_constant,cmd); }
 void doMotor(char *cmd) { command.motor(&motor, cmd); }
 void onPid(char *cmd)
 {
@@ -173,21 +182,20 @@ void setup()
   // Current PID settings
   // TODO: Autotuning
   //Iq
+  motor.LPF_current_q.Tf = time_constant;
   motor.PID_current_q.P = 0.25;
   motor.PID_current_q.I = 10;
-  motor.LPF_current_q.Tf = 0.01;
   motor.PID_current_q.limit = POWER_SUPPLY;
   motor.PID_current_q.output_ramp = 250;
   //Id
+  motor.LPF_current_d.Tf = time_constant;
   motor.PID_current_d.P = 0.25;
   motor.PID_current_d.I = 10;
-  motor.LPF_current_d.Tf = 0.01;
   motor.PID_current_q.limit = POWER_SUPPLY;
   motor.PID_current_d.output_ramp = 250;
 
   // Setting the motor limits
   motor.voltage_limit = MOTOR_LIMIT; // Volts - default driver.voltage_limit     - Hard limit on output voltage, in volts. Effectively limits PWM duty cycle proportionally to power supply voltage.
-  motor.motion_downsample = 100;
 
   // Configurating Serial to control motor
 
@@ -198,8 +206,7 @@ void setup()
   // motor.monitor_variables = _MON_TARGET | _MON_VEL | _MON_ANGLE;
   // Choosed infos to plot and debbug
 
-  // downsampling
-  //  motor.monitor_downsample = 100; // default 10
+
   // Circuit configurations finished
 
   // Initializing motor
@@ -215,6 +222,7 @@ void setup()
   // control procedure via Serial
   command.add('T', doTarget, "target Current");
   command.add('O', doOffset, "offset");
+  command.add('A',onLpf,"my lpf");
   command.add('C', onPid, "my pid");
 
   SIMPLEFOC_DEBUG("Motor ready.");
@@ -230,9 +238,10 @@ void loop()
   {
     //CalculateButtonThrottle();
 
-    float error = motor.target - motor.current.q;
-    motor.zero_electric_angle = offset_angle;
-
+    //float error = motor.target - motor.current.q;
+    //motor.zero_electric_angle = offset_angle;
+    motor.LPF_current_q.Tf = time_constant;
+    motor.LPF_current_d.Tf = time_constant;
     PulseAndGlide();
 
     cycle = 0;
@@ -240,9 +249,9 @@ void loop()
     DBG(" , ");
     DBG(motor.current.q); // milli Amps
     DBG(" , ");
-    DBG(motor.shaft_velocity);
-    DBG(" , ");
-    DBGLN(motor.electrical_angle);
+    DBGLN(motor.shaft_velocity);
+    //DBG(" , ");
+    //DBGLN(motor.electrical_angle);
 
     command.run();
   }
