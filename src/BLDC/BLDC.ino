@@ -19,7 +19,7 @@ PHASE C - YELLOW
 
 #define DEBUG_ON 1
 #define DEBUG_OFF 0
-byte debugMode = DEBUG_ON;
+byte debugMode = DEBUG_OFF;
 
 #define DBGLN(...) debugMode == DEBUG_ON ? Serial.println(__VA_ARGS__) : NULL
 #define DBG(...) debugMode == DEBUG_ON ? Serial.print(__VA_ARGS__) : NULL
@@ -27,26 +27,34 @@ byte debugMode = DEBUG_ON;
 const int POWER_SUPPLY = 42;
 const int DRIVER_LIMIT = 42;
 const int MOTOR_LIMIT = 41;
+const int MAX_TORQUE = 25;
 
 const int PWM_FREQ = 20000;
 const int MOTOR_KV = 10.5;
-const int TURNOFF_SPEED = 50; // rad/s
+const int TURNOFF_SPEED = 40; // rad/s
 const int TURNON_SPEED = 13;  // rad/s
+const int STARTUP_SPEED = 5; 
 const int SPEED_CYCLES = 250;
-const float ACCEL_RAMP = 0.001;
+const float ACCEL_RAMP = 0.02;
+const float FAST_ACCEL_RAMP=0.02*2;
+const float DESACEL_RAMP = ACCEL_RAMP * 8;
 
 const int POLE_PAIRS = 88;  
-const float PHASE_RESISTANCE = 0.098;
-const float PHASE_INDUCTANCE = 0.0000644;
-const float PM_FLUX_LINKAGE = 0.001;
+const float PHASE_RESISTANCE = 0.095f;
+const float PHASE_INDUCTANCE = 0.0000644f;
+const float PM_FLUX_LINKAGE = 0.0029f;
+const float BASE_SPEED = 18.5f;
+
+const int JOYSTICK_LOW_THRESHOLD = 800;
+const int JOYSTICK_HIGH_THRESHOLD = 200;
 
 bool MAX_VEL_TRIGGERED = false;
 float target_torque = 0;
 float offset_angle = 3.14f;
 // BLDC motor & driver instance
 // BLDC motor instance BLDCMotor(polepairs, (R), (KV))
-BLDCMotor motor = BLDCMotor(88, 0.098, MOTOR_KV, PHASE_INDUCTANCE);
-//BLDCCustomMotor motor = BLDCCustomMotor(POLE_PAIRS, PHASE_RESISTANCE, MOTOR_KV, PM_FLUX_LINKAGE);
+//BLDCMotor motor = BLDCMotor(88, 0.098, MOTOR_KV, PHASE_INDUCTANCE);
+BLDCCustomMotor motor = BLDCCustomMotor(POLE_PAIRS, PHASE_RESISTANCE, MOTOR_KV, PM_FLUX_LINKAGE, BASE_SPEED);
 // PWM pins
 BLDCDriver6PWM driver = BLDCDriver6PWM(PA8, PB13, PA9, PB14, PA10, PB15);
 
@@ -96,16 +104,18 @@ void setup()
   }
   // Initial delay for connecting to serial
   delay(3000);
-
+  pinMode(PB10, INPUT);   
   // Custom Start configs
   // Tun on Motor Driver Enable
   SIMPLEFOC_DEBUG("Driver Enable ");
+  
   pinMode(PA4, OUTPUT);
   digitalWrite(PA4, HIGH);
+  
+  pinMode(PA2, INPUT);
 
   delay(500);
-  // nFault PIN - Attach interrupt to trigger shutdown function if driver fault is detected
-  pinMode(PB10, INPUT);                                                         
+  // nFault PIN - Attach interrupt to trigger shutdown function if driver fault is detected                                                      
   attachInterrupt(digitalPinToInterrupt(PB10), ChecknFaultProtection, FALLING);
   pinMode(PA6, INPUT);
 
@@ -181,16 +191,16 @@ void setup()
   // TODO: Autotuning
   //Iq
   motor.LPF_current_q.Tf = 0.005f;
-  motor.PID_current_q.P = 1.5f; 
-  motor.PID_current_q.I = 100;
+  motor.PID_current_q.P = 1; 
+  motor.PID_current_q.I = 25;
   motor.PID_current_q.limit = POWER_SUPPLY;
-  motor.PID_current_q.output_ramp = 250;
+  motor.PID_current_q.output_ramp = 500;
   //Id
   motor.LPF_current_d.Tf = 0.005f;
-  motor.PID_current_d.P = 1.5f;
-  motor.PID_current_d.I = 100;
+  motor.PID_current_d.P = 1;
+  motor.PID_current_d.I = 25;
   motor.PID_current_q.limit = POWER_SUPPLY;
-  motor.PID_current_d.output_ramp = 250;
+  motor.PID_current_d.output_ramp = 500;
 
   // Setting the motor limits
   motor.voltage_limit = MOTOR_LIMIT; // Volts - default driver.voltage_limit     - Hard limit on output voltage, in volts. Effectively limits PWM duty cycle proportionally to power supply voltage.
@@ -218,31 +228,37 @@ void setup()
   motor.initFOC();
 
   // control procedure via Serial
+  if(debugMode)
+  {
   command.add('T', doTarget, "target Current");
   command.add('O', doOffset, "offset");
   command.add('C', onPid, "my pid");
+  }
+
 
   SIMPLEFOC_DEBUG("Motor ready.");
 }
 
 void loop()
 {
-
+  //long time = _micros();
   motor.loopFOC();
 
   cycle = cycle + 1;
   if (cycle == SPEED_CYCLES)
   {
-    //CalculateButtonThrottle();
-
+    CalculateThrottle();
+   // float diff = _micros() - time;
+   // SIMPLEFOC_DEBUG("time in micros:", diff);
     //float error = motor.target - motor.current.q;
     //motor.zero_electric_angle = offset_angle;
-    PulseAndGlide();
-    PhaseCurrent_s currents = current_sense.getPhaseCurrents();
+    //PulseAndGlide();
     cycle = 0;
     DBG(motor.target); // milli Amps
     DBG(" , ");
-    DBGLN(motor.current.q); // milli Amps
+    DBG(motor.current.q); // milli Amps
+    DBG(" , ");
+    DBGLN(motor.shaft_velocity);
     // DBG(" , ");
     // DBGLN(motor.shaft_velocity);
     //DBG(" , ");
@@ -252,16 +268,25 @@ void loop()
   }
 }
 
-void CalculateButtonThrottle()
-{
+void CalculateThrottle()
+{   
+    //int joystick = analogRead(PA3);
+    //SIMPLEFOC_DEBUG("joystick", joystick);
     int button_pressed = digitalRead(PA6);
-    if(button_pressed == HIGH){
-      target_torque = constrain(target_torque + ACCEL_RAMP, 0, 1);
-      SIMPLEFOC_DEBUG("pressed");
+    // SIMPLEFOC_DEBUG("button", button_pressed);
+    float accel_rmp = (motor.shaft_velocity < STARTUP_SPEED) ? FAST_ACCEL_RAMP : ACCEL_RAMP;
+    if(button_pressed == HIGH){  // || joystick > JOYSTICK_LOW_THRESHOLD
+      target_torque = constrain(target_torque + accel_rmp, 0, MAX_TORQUE);
     }
-    else {
-      target_torque = constrain(target_torque - ACCEL_RAMP*5, 0, 1);
+    // else if(joystick < JOYSTICK_HIGH_THRESHOLD) 
+    // {
+    //   target_torque = constrain(target_torque + ACCEL_RAMP, 0, MAX_TORQUE);
+    // }
+    else
+    {
+      target_torque = constrain(target_torque - DESACEL_RAMP, 0, MAX_TORQUE);
     }
+    PulseAndGlide();
     SIMPLEFOC_DEBUG("TARGET TORQUE:", target_torque);
 }
 
@@ -272,7 +297,7 @@ if (MAX_VEL_TRIGGERED)
     {
       if (motor.shaft_velocity < TURNON_SPEED)
       {
-        SIMPLEFOC_DEBUG("RE-ENABLING");
+        //SIMPLEFOC_DEBUG("RE-ENABLING");
         motor.move(target_torque);
         MAX_VEL_TRIGGERED = false;
       }

@@ -175,7 +175,7 @@ void setup()
   // motor Aligned and direction of rotation configuration completed
 
   // FOC modulation settings:
-  motor.foc_modulation = FOCModulationType::SpaceVectorPWM;
+  motor.foc_modulation = FOCModulationType::;
   motor.torque_controller = TorqueControlType::foc_current;
   motor.controller = MotionControlType::torque;
 

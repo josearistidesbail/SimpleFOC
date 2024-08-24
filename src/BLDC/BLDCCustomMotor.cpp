@@ -397,22 +397,28 @@ void BLDCCustomMotor::loopFOC()
   current.d = LPF_current_d(current.d);
 
   // calculate the phase voltages
-  float iq_ref = current_sp;
-  float id_ref = 0;
+  // float iq_ref = current_sp;
+  // float id_ref = 0;
   // If we are over the base speed, activate CVCP - Constant voltage, constant power algorithm
-  if(shaft_velocity > base_speed)
-  {
-    id_ref = (phi_pm/phase_inductance)*((shaft_velocity/base_speed) -1);
-    iq_ref = (shaft_velocity/base_speed)*iq_ref;
-  }
+  // if(shaft_velocity > base_speed)
+  // {
+  //   id_ref = (phi_pm/phase_inductance)*((shaft_velocity/base_speed) -1);
+  //   iq_ref = (shaft_velocity/base_speed)*iq_ref;
+  // }
   // Calculates d an q voltage and adds axis decoupling components
-  float electrical_velocity = shaft_velocity * pole_pairs;
-  voltage.q = constrain(PID_current_q(current_sp - current.q) + shaft_velocity * pole_pairs * phase_inductance * current.d, -voltage_limit, voltage_limit);
-  voltage.d = constrain(PID_current_d(-current.d) - electrical_velocity * phase_inductance * current.q + electrical_velocity * phi_pm, -voltage_limit, voltage_limit);
+  // float electrical_velocity = shaft_velocity * pole_pairs;
+  // voltage.q = constrain(PID_current_q(current_sp - current.q) + shaft_velocity * pole_pairs * phase_inductance * current.d, -voltage_limit, voltage_limit);
+  // voltage.d = constrain(PID_current_d(-current.d) - electrical_velocity * phase_inductance * current.q + electrical_velocity * phi_pm, -voltage_limit, voltage_limit);
 
   // d voltage - lag compensation - TODO verify
   // if(_isset(phase_inductance)) voltage.d = _constrain( voltage.d - current_sp*sh,aft_velocity*pole_pairs*phase_inductance, -voltage_limit, voltage_limit);
 
+      // calculate the phase voltages
+  voltage.q = PID_current_q(current_sp - current.q);
+  voltage.d = PID_current_d(-current.d);
+      // d voltage - lag compensation - TODO verify
+  //if(_isset(phase_inductance)) voltage.d = _constrain( voltage.d - current_sp*shaft_velocity*pole_pairs*phase_inductance, -voltage_limit, voltage_limit);
+    
   // set the phase voltage - FOC heart function :)
   setPhaseVoltage(voltage.q, voltage.d, electrical_angle);
 }
