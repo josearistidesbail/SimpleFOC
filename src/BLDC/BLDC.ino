@@ -180,17 +180,17 @@ void setup()
   // Current PID settings
   // TODO: Autotuning
   //Iq
-  motor.LPF_current_q.Tf = 0;
-  motor.PID_current_q.P = 0;
-  motor.PID_current_q.I = 0;
+  motor.LPF_current_q.Tf = 0.005f;
+  motor.PID_current_q.P = 1.5f; 
+  motor.PID_current_q.I = 100;
   motor.PID_current_q.limit = POWER_SUPPLY;
-  motor.PID_current_q.output_ramp = 0;
+  motor.PID_current_q.output_ramp = 250;
   //Id
-  motor.LPF_current_d.Tf = 0;
-  motor.PID_current_d.P = 0;
-  motor.PID_current_d.I = 0;
+  motor.LPF_current_d.Tf = 0.005f;
+  motor.PID_current_d.P = 1.5f;
+  motor.PID_current_d.I = 100;
   motor.PID_current_q.limit = POWER_SUPPLY;
-  motor.PID_current_d.output_ramp = 0;
+  motor.PID_current_d.output_ramp = 250;
 
   // Setting the motor limits
   motor.voltage_limit = MOTOR_LIMIT; // Volts - default driver.voltage_limit     - Hard limit on output voltage, in volts. Effectively limits PWM duty cycle proportionally to power supply voltage.
@@ -238,7 +238,7 @@ void loop()
     //float error = motor.target - motor.current.q;
     //motor.zero_electric_angle = offset_angle;
     PulseAndGlide();
-
+    PhaseCurrent_s currents = current_sense.getPhaseCurrents();
     cycle = 0;
     DBG(motor.target); // milli Amps
     DBG(" , ");
