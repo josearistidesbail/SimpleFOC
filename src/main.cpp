@@ -58,7 +58,11 @@ float target_torque = 0;
 float simulated_enable = 0;
 // BLDC motor & driver instance
 // BLDC motor instance BLDCMotor(polepairs, (R), (KV))
+
+// Uncomment this to use default class from SimpleFOC library:
 // BLDCMotor motor = BLDCMotor(88, 0.098, MOTOR_KV, PHASE_INDUCTANCE);
+
+// Uncomment this to use custom class:
 BLDCCustomMotor motor = BLDCCustomMotor(POLE_PAIRS, PHASE_RESISTANCE, MOTOR_KV, PM_FLUX_LINKAGE, BASE_SPEED);
 // PWM pins
 BLDCDriver6PWM driver = BLDCDriver6PWM(PA8, PB13, PA9, PB14, PA10, PB15);
